@@ -710,32 +710,36 @@ Hola {user.first_name}, soy tu asistente de trading crypto profesional.
     
     
     
-    def run_bot(self):
+    async def handle_comprar(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        args = context.args
+        if len(args) != 2:
+            await update.message.reply_text("❌ Formato incorrecto. Usa: /comprar BTC 10")
+            return
+        moneda, cantidad = args[0].upper(), float(args[1])
+        await update.message.reply_text(f"✅ Compra simulada de {cantidad} {moneda}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error al procesar compra: {e}")
+
+async def handle_vender(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        args = context.args
+        if len(args) != 2:
+            await update.message.reply_text("❌ Formato incorrecto. Usa: /vender BTC 5")
+            return
+        moneda, cantidad = args[0].upper(), float(args[1])
+        await update.message.reply_text(f"📉 Venta simulada de {cantidad} {moneda}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error al procesar venta: {e}")
+
+def run_bot(self):
     """Ejecutar el bot"""
+    print("🚀 Iniciando OMNIX Bot para Render...")
+    application.add_handler(CommandHandler("start", self.handle_start))
+    application.add_handler(CommandHandler("balance", self.handle_balance))
     application.add_handler(CommandHandler("comprar", self.handle_comprar))
     application.add_handler(CommandHandler("vender", self.handle_vender))
-
-    async def handle_comprar(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        try:
-            args = context.args
-            if len(args) != 2:
-                await update.message.reply_text("❌ Formato incorrecto. Usa: /comprar BTC 10")
-                return
-            moneda, cantidad = args[0].upper(), float(args[1])
-            await update.message.reply_text(f"✅ Compra simulada de {cantidad} {moneda}")
-        except Exception as e:
-            await update.message.reply_text(f"❌ Error al procesar compra: {e}")
-
-    async def handle_vender(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        try:
-            args = context.args
-            if len(args) != 2:
-                await update.message.reply_text("❌ Formato incorrecto. Usa: /vender BTC 5")
-                return
-            moneda, cantidad = args[0].upper(), float(args[1])
-            await update.message.reply_text(f"✅ Venta simulada de {cantidad} {moneda}")
-        except Exception as e:
-            await update.message.reply_text(f"❌ Error al procesar venta: {e}")
+    application.run_polling()
 
  try:
             print("🚀 Iniciando OMNIX Bot para Render...")
