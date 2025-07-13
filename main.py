@@ -66,6 +66,3 @@ def main():
 # PUNTO DE EJECUCIÓN
 if __name__ == "__main__":
     main()
-
-
-      
