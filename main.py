@@ -708,8 +708,8 @@ Hola {user.first_name}, soy tu asistente de trading crypto profesional.
         except Exception as e:
             logger.error(f"Error en handle_voice: {e}")
     
-    def run_bot(self):
-        """Ejecutar el bot"""
+    
+
            async def handle_comprar(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             args = context.args
