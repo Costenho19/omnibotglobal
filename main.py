@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class OmnixBotRender:
 
     def __init__(self):
-        self.bot_token = "7478164319:AAFpPNqkFJmrhfafrcbbm50fgUtQnRM6kEY"
+        self.bot_token = "8028883366:AAGoM7fMFXH-bJCvk4FIGsCJ3lFd4PkI0Ro"
     async def handle_voice(self, updte: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             # Procesamiento de voz personalizado
