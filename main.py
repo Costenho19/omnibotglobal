@@ -1,79 +1,55 @@
-
-import logging
 from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
+from telegram.ext import Application, CommandHandler, ContextTypes
+from fastapi import FastAPI, Request
+import uvicorn
+import os
 
-# Configuración del logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Clase del bot principal
 class OmnixBotRender:
-
     def __init__(self):
-        self.bot_token = "7478164319:AAFpPNqkFJmrhfafrcbbm50fgUtQnRM6kEY"
-    async def handle_voice(self, updte: Update, context: ContextTypes.DEFAULT_TYPE):
-        try:
-            # Procesamiento de voz personalizado
-            pass
-        except Exception as e:
-            logger.error(f"Error en handle_voice: {e}")
+        self.bot_token = "AQUI_VA_TU_TOKEN"  # ⬅️ Pon aquí tu token real
 
-    def handle_start(self, update, context):
-        update.message.reply_text("Bot iniciado correctamente.")
+    # Comandos del bot
+    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("👋 ¡Hola! Soy OMNIX, tu asistente de trading. ¿Cómo puedo ayudarte?")
 
-    def handle_balance(self, update, context):
-        update.message.reply_text("Tu balance es de $0.00")
+    async def balance(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("💰 Tu balance actual es de $0.00 (demo).")
 
-    def handle_comprar(self, update, context):
-        update.message.reply_text("Compra realizada correctamente.")
+    async def comprar(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("🟢 Has enviado una orden de compra simulada. (No es real)")
 
-    def handle_vender(self, update, context):
-        update.message.reply_text("Venta ejecutada con éxito.")
+    async def voz(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("🎤 Procesando tu mensaje de voz...")
 
-    def handle_prices(self, update, context):
-        update.message.reply_text("Precios actualizados.")
+    async def ayuda(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text(
+            "📋 Comandos disponibles:\n/start\n/balance\n/comprar\n/voz\n/ayuda"
+        )
 
-    def handle_trading(self, update, context):
-        update.message.reply_text("Trading iniciado.")
-
-    def handle_message(self, update, context):
-        update.message.reply_text("Mensaje recibido.")
-
-    def run_bot(self):
-        print("✅ Iniciando OMNIX Bot para Render...")
-
+    def build(self):
         application = Application.builder().token(self.bot_token).build()
+        application.add_handler(CommandHandler("start", self.start))
+        application.add_handler(CommandHandler("balance", self.balance))
+        application.add_handler(CommandHandler("comprar", self.comprar))
+        application.add_handler(CommandHandler("voz", self.voz))
+        application.add_handler(CommandHandler("ayuda", self.ayuda))
+        return application
 
-        # Handlers de comandos
-        application.add_handler(CommandHandler("start", self.handle_start))
-        application.add_handler(CommandHandler("balance", self.handle_balance))
-        application.add_handler(CommandHandler("comprar", self.handle_comprar))
-        application.add_handler(CommandHandler("vender", self.handle_vender))
-        application.add_handler(CommandHandler("prices", self.handle_prices))
-        application.add_handler(CommandHandler("trading", self.handle_trading))
+omnix = OmnixBotRender()
+application = omnix.build()
+app = FastAPI()
 
-        # Handlers de mensajes (texto y voz)
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
-        application.add_handler(MessageHandler(filters.VOICE, self.handle_voice))
+@app.on_event("startup")
+async def on_startup():
+    print("🚀 OMNIX se está iniciando...")
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
 
-        application.run_polling()
+@app.on_event("shutdown")
+async def on_shutdown():
+    print("⛔ Deteniendo OMNIX...")
+    await application.updater.stop()
+    await application.stop()
+    await application.shutdown()
 
-# Función principal
-def main():
-    try:
-        print("🚀 OMNIX BOT - DEPLOYMENT RENDER INICIADO")
-        bot = OmnixBotRender()
-        bot.run_bot()
-    except Exception as e:
-        logger.error(f"Error iniciando bot: {e}")
-        print(f"❌ Error crítico: {e}")
-
-if __name__ == "__main__":
-    main()
