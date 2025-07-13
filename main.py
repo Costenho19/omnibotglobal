@@ -31,26 +31,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Aquí iría TODO tu código de clases, funciones y lógica existente sin modificación
-
-# MÉTODO CORREGIDO: run_bot
-    def run_bot(self):
-        """Ejecutar el bot"""
-        print("🚀 Iniciando OMNIX Bot para Render...")
-
-        application = Application.builder().token(self.bot_token).build()
-
-        # Handlers
-        application.add_handler(CommandHandler("start", self.handle_start))
-        application.add_handler(CommandHandler("balance", self.handle_balance))
-        application.add_handler(CommandHandler("comprar", self.handle_comprar))
-        application.add_handler(CommandHandler("vender", self.handle_vender))
-        application.add_handler(CommandHandler("prices", self.handle_prices))
-        application.add_handler(CommandHandler("trading", self.handle_trading))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
-        application.add_handler(MessageHandler(filters.VOICE, self.handle_voice))
-
-        application.run_polling()
+class OmnixBotRender:
+    
+    
+    # MÉTODO CORREGIDO: run_bot
+            def run_bot(self):
+            """Ejecutar el bot"""
+            print("🚀 Iniciando OMNIX Bot para Render...")
+        
+            application = Application.builder().token(self.bot_token).build()
+        
+            # Handlers
+            application.add_handler(CommandHandler("start", self.handle_start))
+            application.add_handler(CommandHandler("balance", self.handle_balance))
+            application.add_handler(CommandHandler("comprar", self.handle_comprar))
+            application.add_handler(CommandHandler("vender", self.handle_vender))
+            application.add_handler(CommandHandler("prices", self.handle_prices))
+            application.add_handler(CommandHandler("trading", self.handle_trading))
+            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
+            application.add_handler(MessageHandler(filters.VOICE, self.handle_voice))
+        
+            application.run_polling()
 
 # NUEVA FUNCIÓN CORRECTAMENTE DEFINIDA
 def main():
