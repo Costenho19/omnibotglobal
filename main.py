@@ -710,7 +710,28 @@ Hola {user.first_name}, soy tu asistente de trading crypto profesional.
     
     def run_bot(self):
         """Ejecutar el bot"""
+           async def handle_comprar(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
+            args = context.args
+            if len(args) != 2:
+                await update.message.reply_text("❌ Formato incorrecto. Usa: /comprar BTC 10")
+                return
+            moneda, cantidad = args[0].upper(), float(args[1])
+            await update.message.reply_text(f"✅ Compra simulada de {cantidad} {moneda}")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error al procesar compra: {e}")
+
+    async def handle_vender(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            args = context.args
+            if len(args) != 2:
+                await update.message.reply_text("❌ Formato incorrecto. Usa: /vender BTC 5")
+                return
+            moneda, cantidad = args[0].upper(), float(args[1])
+            await update.message.reply_text(f"✅ Venta simulada de {cantidad} {moneda}")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error al procesar venta: {e}")
+ try:
             print("🚀 Iniciando OMNIX Bot para Render...")
             
             # Crear aplicación
@@ -721,7 +742,9 @@ Hola {user.first_name}, soy tu asistente de trading crypto profesional.
             application.add_handler(CommandHandler("balance", self.handle_balance))
             application.add_handler(CommandHandler("prices", self.handle_prices))
             application.add_handler(CommandHandler("trading", self.handle_trading))
-            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
+            application.add_handler(CommandHandler("comprar", self.handle_comprar))
+application.add_handler(CommandHandler("vender", self.handle_vender))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
             application.add_handler(MessageHandler(filters.VOICE, self.handle_voice))
             
             # Iniciar bot
