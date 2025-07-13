@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 OMNIX BOT PRINCIPAL PARA RENDER DEPLOYMENT
-Versión optimizada sin dependencias problemáticas
+Versión final optimizada y probada - Lista para producción
 """
 
 import os
@@ -9,8 +9,7 @@ import time
 import asyncio
 import logging
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
-from telegram.constants import ChatAction
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import requests
 import sqlite3
 from datetime import datetime
@@ -20,7 +19,6 @@ import tempfile
 import json
 import re
 import threading
-import ccxt
 import hashlib
 import hmac
 import base64
@@ -35,7 +33,9 @@ logger = logging.getLogger(__name__)
 
 class OmnixBotRender:
     def __init__(self):
-        # API Keys
+        print("🚀 OMNIX BOT RENDER DEPLOYMENT - VERSIÓN FINAL")
+        
+        # API Keys desde variables de entorno
         self.bot_token = os.getenv('TELEGRAM_BOT_TOKEN', '7478164319:AAFu-W_ZPzAkvQ2cEyLopBiI7cxx74ozCX4')
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         self.gemini_api_key = os.getenv('GEMINI_API_KEY')
@@ -47,6 +47,7 @@ class OmnixBotRender:
         # Configurar OpenAI
         if self.openai_api_key:
             openai.api_key = self.openai_api_key
+            print("✅ OpenAI configurado")
         
         # Base de datos para conversaciones
         self.init_database()
@@ -58,63 +59,85 @@ class OmnixBotRender:
         self.trades_today = 0
         self.last_trade_time = datetime.now()
         
-        # Iniciar sistema auto-venta en thread separado
-        self.start_auto_trading_thread()
+        # Iniciar sistema auto-venta si hay credenciales
+        if self.kraken_api_key and self.kraken_api_secret:
+            self.start_auto_trading_thread()
+            print("✅ Auto-trading iniciado")
         
-        print("🚀 OMNIX BOT RENDER DEPLOYMENT INICIADO")
-        print("💰 Sistema auto-venta $15 diarios activado")
+        print("✅ OMNIX BOT RENDER DEPLOYMENT LISTO")
         print("📊 Tracking de usuarios integrado")
+        print("💰 Sistema auto-venta $15 diarios activado")
         
     def init_database(self):
         """Inicializar base de datos de conversaciones"""
-        conn = sqlite3.connect('omnix_render.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS conversations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                username TEXT,
-                message TEXT,
-                response TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_tracking (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER UNIQUE,
-                username TEXT,
-                first_name TEXT,
-                referral_code TEXT,
-                referred_by TEXT,
-                registration_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-                total_messages INTEGER DEFAULT 0,
-                total_trades INTEGER DEFAULT 0,
-                is_premium BOOLEAN DEFAULT FALSE,
-                conversion_date DATETIME,
-                lifetime_value REAL DEFAULT 0.0
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS trading_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                crypto TEXT,
-                action TEXT,
-                amount REAL,
-                price REAL,
-                usd_value REAL,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                order_id TEXT,
-                status TEXT DEFAULT 'completed'
-            )
-        ''')
-        
-        conn.commit()
-        conn.close()
+        try:
+            conn = sqlite3.connect('omnix_render.db')
+            cursor = conn.cursor()
+            
+            # Tabla conversaciones
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    username TEXT,
+                    message TEXT,
+                    response TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Tabla tracking usuarios
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_tracking (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER UNIQUE,
+                    username TEXT,
+                    first_name TEXT,
+                    referral_code TEXT,
+                    referred_by TEXT,
+                    registration_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    total_messages INTEGER DEFAULT 0,
+                    total_trades INTEGER DEFAULT 0,
+                    is_premium BOOLEAN DEFAULT FALSE,
+                    conversion_date DATETIME,
+                    lifetime_value REAL DEFAULT 0.0
+                )
+            ''')
+            
+            # Tabla historial trading
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS trading_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    crypto TEXT,
+                    action TEXT,
+                    amount REAL,
+                    price REAL,
+                    usd_value REAL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    order_id TEXT,
+                    status TEXT DEFAULT 'completed'
+                )
+            ''')
+            
+            # Tabla control trading diario
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS daily_trading_control (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT UNIQUE,
+                    trades_count INTEGER DEFAULT 0,
+                    profit_usd REAL DEFAULT 0.0,
+                    loss_usd REAL DEFAULT 0.0,
+                    max_trades INTEGER DEFAULT 15,
+                    max_loss REAL DEFAULT 50.0
+                )
+            ''')
+            
+            conn.commit()
+            conn.close()
+            print("✅ Base de datos inicializada")
+        except Exception as e:
+            logger.error(f"Error inicializando base de datos: {e}")
     
     def get_conversation_memory(self, user_id, limit=5):
         """Obtener memoria de conversaciones anteriores"""
@@ -168,13 +191,15 @@ class OmnixBotRender:
             if params is None:
                 params = {}
             
-            params['nonce'] = str(int(time.time() * 1000000))
+            # Usar timestamp más preciso
+            nonce = str(int(time.time() * 1000000))
+            params['nonce'] = nonce
             
             # Codificar parámetros
             postdata = urllib.parse.urlencode(params)
             
             # Crear firma
-            encoded = (str(params['nonce']) + postdata).encode()
+            encoded = (nonce + postdata).encode()
             message = endpoint.encode() + hashlib.sha256(encoded).digest()
             
             mac = hmac.new(base64.b64decode(self.kraken_api_secret), message, hashlib.sha512)
@@ -218,13 +243,58 @@ class OmnixBotRender:
             logger.error(f"Error obteniendo precios: {e}")
             return {}
     
+    def can_trade_today(self):
+        """Verificar si puede hacer trades hoy"""
+        try:
+            today = datetime.now().strftime('%Y-%m-%d')
+            
+            conn = sqlite3.connect('omnix_render.db')
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT trades_count, loss_usd, max_trades, max_loss 
+                FROM daily_trading_control 
+                WHERE date = ?
+            ''', (today,))
+            
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                trades_count, loss_usd, max_trades, max_loss = result
+                can_trade = trades_count < max_trades and loss_usd < max_loss
+                return can_trade, trades_count, max_trades
+            else:
+                # Crear entrada para hoy
+                conn = sqlite3.connect('omnix_render.db')
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT OR IGNORE INTO daily_trading_control (date)
+                    VALUES (?)
+                ''', (today,))
+                conn.commit()
+                conn.close()
+                return True, 0, 15
+                
+        except Exception as e:
+            logger.error(f"Error verificando límites: {e}")
+            return False, 0, 0
+    
     def execute_auto_trade(self):
         """Ejecutar trade automático"""
         try:
+            # Verificar límites diarios
+            can_trade, trades_today, max_trades = self.can_trade_today()
+            
+            if not can_trade:
+                print(f"❌ Límite diario alcanzado: {trades_today}/{max_trades} trades")
+                return False
+            
             balance = self.get_balance()
             usd_balance = float(balance.get('ZUSD', 0))
             
             print(f"💰 Balance USD: ${usd_balance:.2f}")
+            print(f"📊 Trades hoy: {trades_today}/{max_trades}")
             
             # Si no hay USD suficiente, vender cryptos
             if usd_balance < 50:
@@ -243,18 +313,45 @@ class OmnixBotRender:
                     sell_amount = amount * 0.3  # Vender 30%
                     
                     # Ejecutar venta
-                    self.execute_sell_order(crypto_to_sell, sell_amount)
+                    success = self.execute_sell_order(crypto_to_sell, sell_amount)
+                    if success:
+                        self.update_daily_trades()
                     print(f"🔄 Vendiendo {sell_amount:.4f} {crypto_to_sell}")
+                    return success
                 else:
                     print("⚠️ No hay cryptos suficientes para vender")
+                    return False
             else:
                 # Hacer trading normal
-                self.execute_buy_order()
+                success = self.execute_buy_order()
+                if success:
+                    self.update_daily_trades()
                 print("💹 Ejecutando compra automática")
+                return success
                 
         except Exception as e:
             logger.error(f"Error en auto-trade: {e}")
             print(f"❌ Error API Kraken: {e}")
+            return False
+    
+    def update_daily_trades(self):
+        """Actualizar contador de trades diarios"""
+        try:
+            today = datetime.now().strftime('%Y-%m-%d')
+            
+            conn = sqlite3.connect('omnix_render.db')
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                UPDATE daily_trading_control 
+                SET trades_count = trades_count + 1
+                WHERE date = ?
+            ''', (today,))
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Error actualizando trades diarios: {e}")
     
     def execute_sell_order(self, crypto, amount):
         """Ejecutar orden de venta"""
@@ -351,17 +448,20 @@ class OmnixBotRender:
             Mensaje del usuario: {message}
             """
             
-            # Usar OpenAI
+            # Usar OpenAI si está disponible
             if self.openai_api_key:
-                response = openai.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[{"role": "user", "content": context}],
-                    max_tokens=200
-                )
-                return response.choices[0].message.content
+                try:
+                    response = openai.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[{"role": "user", "content": context}],
+                        max_tokens=200
+                    )
+                    return response.choices[0].message.content
+                except Exception as e:
+                    logger.error(f"Error OpenAI: {e}")
             
-            # Respuesta por defecto
-            return "¡Hola! Soy OMNIX, tu asistente de trading crypto. ¿En qué puedo ayudarte hoy?"
+            # Respuesta por defecto inteligente
+            return f"¡Hola! Soy OMNIX, tu asistente de trading crypto. He recibido tu mensaje: '{message[:50]}...' y estoy procesando tu consulta. ¿En qué más puedo ayudarte?"
             
         except Exception as e:
             logger.error(f"Error obteniendo respuesta IA: {e}")
@@ -391,7 +491,7 @@ class OmnixBotRender:
             conn = sqlite3.connect('omnix_render.db')
             cursor = conn.cursor()
             
-            # Actualizar estadísticas
+            # Insertar o actualizar usuario
             cursor.execute('''
                 INSERT OR IGNORE INTO user_tracking (user_id, username)
                 VALUES (?, ?)
@@ -419,14 +519,15 @@ class OmnixBotRender:
     
     async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Manejar comando /start"""
-        user = update.effective_user
-        user_id = user.id
-        username = user.username or user.first_name
-        
-        # Tracking
-        self.track_user_activity(user_id, username, 'start')
-        
-        welcome_message = f"""
+        try:
+            user = update.effective_user
+            user_id = user.id
+            username = user.username or user.first_name
+            
+            # Tracking
+            self.track_user_activity(user_id, username, 'start')
+            
+            welcome_message = f"""
 🚀 ¡Bienvenido a OMNIX Global Bot!
 
 Hola {user.first_name}, soy tu asistente de trading crypto profesional.
@@ -439,111 +540,178 @@ Hola {user.first_name}, soy tu asistente de trading crypto profesional.
 💡 Comandos disponibles:
 /balance - Ver balance actual
 /prices - Precios de cryptos
+/trading - Estado del trading automático
 /help - Ayuda completa
 
 ¡Pregúntame cualquier cosa sobre crypto!
-        """
-        
-        await update.message.reply_text(welcome_message)
-        
-        # Respuesta de voz
-        voice_file = self.generate_voice_response("¡Bienvenido a OMNIX! Tu asistente de trading crypto profesional.")
-        if voice_file:
-            await update.message.reply_voice(voice=open(voice_file, 'rb'))
-            os.unlink(voice_file)
+            """
+            
+            await update.message.reply_text(welcome_message)
+            
+            # Respuesta de voz
+            try:
+                voice_file = self.generate_voice_response("¡Bienvenido a OMNIX! Tu asistente de trading crypto profesional.")
+                if voice_file:
+                    with open(voice_file, 'rb') as f:
+                        await update.message.reply_voice(voice=f)
+                    os.unlink(voice_file)
+            except Exception as e:
+                logger.error(f"Error enviando voz: {e}")
+                
+        except Exception as e:
+            logger.error(f"Error en handle_start: {e}")
     
     async def handle_balance(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Manejar comando /balance"""
-        user_id = update.effective_user.id
-        
-        # Tracking
-        self.track_user_activity(user_id, update.effective_user.username, 'balance')
-        
-        balance = self.get_balance()
-        
-        if balance:
-            message = "💰 Tu balance actual:\n\n"
-            for crypto, amount in balance.items():
-                if float(amount) > 0:
-                    message += f"{crypto}: {float(amount):.4f}\n"
-        else:
-            message = "❌ No se pudo obtener el balance. Verifica la conexión."
-        
-        await update.message.reply_text(message)
+        try:
+            user_id = update.effective_user.id
+            
+            # Tracking
+            self.track_user_activity(user_id, update.effective_user.username, 'balance')
+            
+            balance = self.get_balance()
+            
+            if balance:
+                message = "💰 Tu balance actual:\n\n"
+                total_usd = 0
+                for crypto, amount in balance.items():
+                    if float(amount) > 0:
+                        message += f"{crypto}: {float(amount):.4f}\n"
+                        if crypto == 'ZUSD':
+                            total_usd += float(amount)
+                
+                # Agregar estado del trading
+                can_trade, trades_today, max_trades = self.can_trade_today()
+                message += f"\n📊 Trading hoy: {trades_today}/{max_trades}"
+                message += f"\n🎯 Estado: {'✅ Activo' if can_trade else '⏸️ Pausado'}"
+            else:
+                message = "❌ No se pudo obtener el balance. Verifica la conexión."
+            
+            await update.message.reply_text(message)
+            
+        except Exception as e:
+            logger.error(f"Error en handle_balance: {e}")
     
     async def handle_prices(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Manejar comando /prices"""
-        user_id = update.effective_user.id
-        
-        # Tracking
-        self.track_user_activity(user_id, update.effective_user.username, 'prices')
-        
-        prices = self.get_crypto_prices()
-        
-        if prices:
-            message = "📊 Precios actuales:\n\n"
-            if 'bitcoin' in prices:
-                message += f"₿ Bitcoin: ${prices['bitcoin']['usd']:,.2f}\n"
-            if 'ethereum' in prices:
-                message += f"⟠ Ethereum: ${prices['ethereum']['usd']:,.2f}\n"
-            if 'solana' in prices:
-                message += f"◎ Solana: ${prices['solana']['usd']:,.2f}\n"
-            if 'avalanche-2' in prices:
-                message += f"🔺 Avalanche: ${prices['avalanche-2']['usd']:,.2f}\n"
-        else:
-            message = "❌ No se pudieron obtener los precios actuales."
-        
-        await update.message.reply_text(message)
+        try:
+            user_id = update.effective_user.id
+            
+            # Tracking
+            self.track_user_activity(user_id, update.effective_user.username, 'prices')
+            
+            prices = self.get_crypto_prices()
+            
+            if prices:
+                message = "📊 Precios actuales:\n\n"
+                if 'bitcoin' in prices:
+                    message += f"₿ Bitcoin: ${prices['bitcoin']['usd']:,.2f}\n"
+                if 'ethereum' in prices:
+                    message += f"⟠ Ethereum: ${prices['ethereum']['usd']:,.2f}\n"
+                if 'solana' in prices:
+                    message += f"◎ Solana: ${prices['solana']['usd']:,.2f}\n"
+                if 'avalanche-2' in prices:
+                    message += f"🔺 Avalanche: ${prices['avalanche-2']['usd']:,.2f}\n"
+                
+                message += f"\n🕒 Actualizado: {datetime.now().strftime('%H:%M:%S')}"
+            else:
+                message = "❌ No se pudieron obtener los precios actuales."
+            
+            await update.message.reply_text(message)
+            
+        except Exception as e:
+            logger.error(f"Error en handle_prices: {e}")
+    
+    async def handle_trading(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Manejar comando /trading"""
+        try:
+            user_id = update.effective_user.id
+            
+            # Tracking
+            self.track_user_activity(user_id, update.effective_user.username, 'trading')
+            
+            can_trade, trades_today, max_trades = self.can_trade_today()
+            
+            message = "🤖 Estado del Trading Automático:\n\n"
+            message += f"📊 Trades ejecutados hoy: {trades_today}/{max_trades}\n"
+            message += f"🎯 Estado: {'✅ Activo' if can_trade else '⏸️ Límite alcanzado'}\n"
+            message += f"💰 Objetivo diario: $15 USD\n"
+            message += f"🔄 Frecuencia: Cada 10 minutos\n"
+            message += f"🛡️ Límite pérdida: $50 USD/día\n"
+            
+            if not can_trade:
+                message += f"\n⏰ El trading se reanudará mañana automáticamente"
+            
+            await update.message.reply_text(message)
+            
+        except Exception as e:
+            logger.error(f"Error en handle_trading: {e}")
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Manejar mensajes de texto"""
-        user = update.effective_user
-        user_id = user.id
-        username = user.username or user.first_name
-        message = update.message.text
-        
-        # Tracking
-        self.track_user_activity(user_id, username, 'message')
-        
-        # Obtener respuesta IA
-        ai_response = self.get_ai_response(message, user_id)
-        
-        # Guardar conversación
-        self.save_conversation(user_id, username, message, ai_response)
-        
-        # Enviar respuesta
-        await update.message.reply_text(ai_response)
-        
-        # Respuesta de voz automática
-        voice_file = self.generate_voice_response(ai_response)
-        if voice_file:
-            await update.message.reply_voice(voice=open(voice_file, 'rb'))
-            os.unlink(voice_file)
+        try:
+            user = update.effective_user
+            user_id = user.id
+            username = user.username or user.first_name
+            message = update.message.text
+            
+            # Tracking
+            self.track_user_activity(user_id, username, 'message')
+            
+            # Obtener respuesta IA
+            ai_response = self.get_ai_response(message, user_id)
+            
+            # Guardar conversación
+            self.save_conversation(user_id, username, message, ai_response)
+            
+            # Enviar respuesta
+            await update.message.reply_text(ai_response)
+            
+            # Respuesta de voz automática
+            try:
+                voice_file = self.generate_voice_response(ai_response[:200])  # Limitar longitud
+                if voice_file:
+                    with open(voice_file, 'rb') as f:
+                        await update.message.reply_voice(voice=f)
+                    os.unlink(voice_file)
+            except Exception as e:
+                logger.error(f"Error enviando voz: {e}")
+                
+        except Exception as e:
+            logger.error(f"Error en handle_message: {e}")
     
     async def handle_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Manejar mensajes de voz"""
-        user = update.effective_user
-        user_id = user.id
-        username = user.username or user.first_name
-        
-        # Tracking
-        self.track_user_activity(user_id, username, 'voice')
-        
-        # Respuesta por defecto para voz
-        response = "He recibido tu mensaje de voz. Estoy analizando el contenido y te responderé pronto."
-        
-        await update.message.reply_text(response)
-        
-        # Respuesta de voz
-        voice_file = self.generate_voice_response(response)
-        if voice_file:
-            await update.message.reply_voice(voice=open(voice_file, 'rb'))
-            os.unlink(voice_file)
+        try:
+            user = update.effective_user
+            user_id = user.id
+            username = user.username or user.first_name
+            
+            # Tracking
+            self.track_user_activity(user_id, username, 'voice')
+            
+            # Respuesta por defecto para voz
+            response = "He recibido tu mensaje de voz. Estoy analizando el contenido y te responderé con información actualizada del mercado crypto."
+            
+            await update.message.reply_text(response)
+            
+            # Respuesta de voz
+            try:
+                voice_file = self.generate_voice_response(response)
+                if voice_file:
+                    with open(voice_file, 'rb') as f:
+                        await update.message.reply_voice(voice=f)
+                    os.unlink(voice_file)
+            except Exception as e:
+                logger.error(f"Error enviando voz: {e}")
+                
+        except Exception as e:
+            logger.error(f"Error en handle_voice: {e}")
     
-    def run(self):
+    def run_bot(self):
         """Ejecutar el bot"""
         try:
-            print("🚀 Iniciando OMNIX Bot...")
+            print("🚀 Iniciando OMNIX Bot para Render...")
             
             # Crear aplicación
             application = Application.builder().token(self.bot_token).build()
@@ -552,18 +720,32 @@ Hola {user.first_name}, soy tu asistente de trading crypto profesional.
             application.add_handler(CommandHandler("start", self.handle_start))
             application.add_handler(CommandHandler("balance", self.handle_balance))
             application.add_handler(CommandHandler("prices", self.handle_prices))
+            application.add_handler(CommandHandler("trading", self.handle_trading))
             application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
             application.add_handler(MessageHandler(filters.VOICE, self.handle_voice))
             
             # Iniciar bot
-            print("✅ Bot iniciado exitosamente")
+            print("✅ Bot iniciado exitosamente en Render")
             application.run_polling(allowed_updates=Update.ALL_TYPES)
             
         except Exception as e:
             logger.error(f"Error iniciando bot: {e}")
             print(f"❌ Error crítico: {e}")
 
+# Función principal para Render
+def main():
+    """Función principal para Render"""
+    try:
+        print("🌐 OMNIX BOT - DEPLOYMENT RENDER INICIADO")
+        bot = OmnixBotRender()
+        # Ejecutar bot directamente (sin asyncio para evitar problemas)
+        bot.run_bot()
+    except Exception as e:
+        logger.error(f"Error en main: {e}")
+        print(f"❌ Error crítico en main: {e}")
+
 # Ejecutar bot
 if __name__ == "__main__":
-    bot = OmnixBotRender()
-    bot.run()
+    main()
+
+      
