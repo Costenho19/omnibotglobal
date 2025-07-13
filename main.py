@@ -710,7 +710,7 @@ Hola {user.first_name}, soy tu asistente de trading crypto profesional.
     
     
     
-    def run_bot(self):
+   def run_bot(self):
     """Ejecutar el bot"""
     print("🚀 Iniciando OMNIX Bot para Render...")
 
@@ -724,28 +724,6 @@ Hola {user.first_name}, soy tu asistente de trading crypto profesional.
 
     application.run_polling()
 
-            application = Application.builder().token(self.bot_token).build()
-            
-            # Handlers
-            application.add_handler(CommandHandler("start", self.handle_start))
-            application.add_handler(CommandHandler("balance", self.handle_balance))
-            application.add_handler(CommandHandler("prices", self.handle_prices))
-            application.add_handler(CommandHandler("trading", self.handle_trading))
-            application.add_handler(CommandHandler("comprar", self.handle_comprar))
-application.add_handler(CommandHandler("vender", self.handle_vender))
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
-            application.add_handler(MessageHandler(filters.VOICE, self.handle_voice))
-            
-            # Iniciar bot
-            print("✅ Bot iniciado exitosamente en Render")
-            application.run_polling(allowed_updates=Update.ALL_TYPES)
-            
-        except Exception as e:
-            logger.error(f"Error iniciando bot: {e}")
-            print(f"❌ Error crítico: {e}")
-
-# Función principal para Render
-def main():
     """Función principal para Render"""
     try:
         print("🌐 OMNIX BOT - DEPLOYMENT RENDER INICIADO")
