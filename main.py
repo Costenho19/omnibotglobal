@@ -36,7 +36,7 @@ class OmnixBotRender:
         print("🚀 OMNIX BOT RENDER DEPLOYMENT - VERSIÓN FINAL")
         
         # API Keys desde variables de entorno
-        self.bot_token = os.getenv('TELEGRAM_BOT_TOKEN', '7478164319:AAFpPNqkFJmrhfafrcbbm50fgUtQnRM6kEY
+        self.bot_token = os.getenv('TELEGRAM_BOT_TOKEN') 
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         self.gemini_api_key = os.getenv('GEMINI_API_KEY')
         
