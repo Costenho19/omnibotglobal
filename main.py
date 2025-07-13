@@ -709,8 +709,13 @@ Hola {user.first_name}, soy tu asistente de trading crypto profesional.
             logger.error(f"Error en handle_voice: {e}")
     
     
+    
+    def run_bot(self):
+    """Ejecutar el bot"""
+    application.add_handler(CommandHandler("comprar", self.handle_comprar))
+    application.add_handler(CommandHandler("vender", self.handle_vender))
 
-           async def handle_comprar(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_comprar(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             args = context.args
             if len(args) != 2:
@@ -731,6 +736,7 @@ Hola {user.first_name}, soy tu asistente de trading crypto profesional.
             await update.message.reply_text(f"✅ Venta simulada de {cantidad} {moneda}")
         except Exception as e:
             await update.message.reply_text(f"❌ Error al procesar venta: {e}")
+
  try:
             print("🚀 Iniciando OMNIX Bot para Render...")
             
